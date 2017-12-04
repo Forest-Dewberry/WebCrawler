@@ -1,5 +1,6 @@
 package assignment;
 import java.net.URL;
+import java.io.*;
 
 /**
  * The Page class holds anything that the QueryEngine returns to the server.  The field and method
@@ -8,7 +9,7 @@ import java.net.URL;
  *
  * TODO: Implement this!
  */
-public class Page {
+public class Page implements Serializable{
     // The URL the page was located at.
     private URL url;
 
@@ -24,4 +25,15 @@ public class Page {
      * @return the URL of the page.
      */
     public URL getURL() { return url; }
+    
+    /**
+     * Override equals method to check for url equality.
+     */
+    public boolean equals(Object o) {
+    		if (!(o instanceof Page))
+    			return false;
+    		Page other = (Page) o;
+    		
+    		return url.getFile().equalsIgnoreCase(other.getURL().getFile());
+    }
 }

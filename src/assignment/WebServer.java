@@ -78,19 +78,26 @@ public class WebServer {
     // Probably add a disclaimer about file links
     Collection<Page> results = engine.query(params.get("query"));
 
-    if (results.size() > 0) {
-      content += "<p>Here are the results of your query.<br> " +
-        "Some browsers don't follow file:// links " +
-        "for security reasons so you'll have to paste the link " +
-        "into the URL bar instead of clicking it.</p>";
-    } else {
-      content += "<p>Your query returned no results.</p>";
+    // returns null if query is invalid
+    if (results == null) {
+    		content += "<p>Invalid query!<p>";
     }
-    content += "<ul>\n";
-    for (Page p : results) {
-      content += "<li>" + layoutPageContent(p) + "</li>\n";
+    else {
+    		if (results.size() > 0) {
+    		  content += "<p>Here are the results of your query.<br> " +
+    		    "Some browsers don't follow file:// links " +
+    		    "for security reasons so you'll have to paste the link " +
+    		    "into the URL bar instead of clicking it.</p>";
+    		} else {
+    		  content += "<p>Your query returned no results.</p>";
+    		}
+
+    		content += "<ul>\n";
+    		for (Page p : results) {
+    		  content += "<li>" + layoutPageContent(p) + "</li>\n";
+    		}
+    		content += "</ul>\n" + "</div> </body>";
     }
-    content += "</ul>\n" + "</div> </body>";
 
     renderResponse(out, content);
   }

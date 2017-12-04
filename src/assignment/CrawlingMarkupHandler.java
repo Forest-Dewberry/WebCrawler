@@ -12,14 +12,32 @@ import org.attoparser.simple.*;
  */
 public class CrawlingMarkupHandler extends AbstractSimpleMarkupHandler {
 
-    public CrawlingMarkupHandler() {}
+	public static final String onlyLetters = "[A-Za-z- .]*"; // Regex String used to find words
+
+	WebIndex index;
+	Set<String> urls;
+	URL currentURL;
+	Page currentPage;
+	String currentTag;
+
+    public CrawlingMarkupHandler() {
+    		index = new WebIndex();
+    		urls = new HashSet<String>();
+    }
+    
+    /**
+     * Sets the current URL of this crawler.
+     */
+    public void updateCurrentURL(URL currentURL) {
+    		this.currentURL = currentURL;
+    		this.currentPage = new Page(currentURL);
+    }
 
     /**
     * This method returns the complete index that has been crawled thus far when called.
     */
     public Index getIndex() {
-        // TODO: Implement this!
-        return new WebIndex();
+        return index;
     }
 
     /**
@@ -27,8 +45,21 @@ public class CrawlingMarkupHandler extends AbstractSimpleMarkupHandler {
     * should be cleared.
     */
     public List<URL> newURLs() {
-        // TODO: Implement this!
-        return new LinkedList<URL>();
+    		assert currentURL != null : "Current URL must be set via updateCurrentURL!";
+    		// convert unique String urls to URL objects
+    		LinkedList<URL> newUrls = new LinkedList<URL>();
+    		for (String url : urls) {
+    			try {
+    				URL urlObject = new URL(currentURL, url);
+    				newUrls.add(urlObject);
+    			} catch (MalformedURLException e) {
+    				// this should never happen
+    				System.err.println("FATAL: invalid URL identified during crawl!");
+    				System.exit(-1);
+    			}
+    		}
+    		urls = new HashSet<String>();
+    		return newUrls;
     }
 
     /**
@@ -48,8 +79,7 @@ public class CrawlingMarkupHandler extends AbstractSimpleMarkupHandler {
     * @param col             the column of the document where parsing starts
     */
     public void handleDocumentStart(long startTimeNanos, int line, int col) {
-        // TODO: Implement this.
-        System.out.println("Start of document");
+    		assert currentURL != null : "Current URL must be set via updateCurrentURL!";
     }
 
     /**
@@ -61,8 +91,7 @@ public class CrawlingMarkupHandler extends AbstractSimpleMarkupHandler {
     * @param col             the column of the document where the parsing ends
     */
     public void handleDocumentEnd(long endTimeNanos, long totalTimeNanos, int line, int col) {
-        // TODO: Implement this.
-        System.out.println("End of document");
+    		// do nothing
     }
 
     /**
@@ -73,8 +102,30 @@ public class CrawlingMarkupHandler extends AbstractSimpleMarkupHandler {
     * @param col         the column in the document where this element appears
     */
     public void handleOpenElement(String elementName, Map<String, String> attributes, int line, int col) {
-        // TODO: Implement this.
-        System.out.println("Start element: " + elementName);
+    		assert currentURL != null : "Current URL must be set via updateCurrentURL!";
+    		currentTag = elementName.toLowerCase();
+
+        // only use 'a' tagged hyperlinks, via Piazza @291
+        if (attributes == null || !elementName.equalsIgnoreCase("a"))
+        		return;
+
+        // urls typically stored as attributes to key href
+        for (String key : attributes.keySet()) {
+            String potentialURL = attributes.get(key);
+        		// only use urls ending in .html
+            if (!potentialURL.endsWith("html"))
+            		continue;
+
+            try {
+                URL url = new URL(currentURL, potentialURL);
+                /*
+                * If we can get to this code that means the URL is valid,
+                * now I can add to Set of Strings, not URLs, to ensure 
+                * there aren't repeats.
+                */
+                urls.add(potentialURL.toLowerCase());
+            } catch (MalformedURLException e) {} // do nothing
+        }
     }
 
     /**
@@ -85,7 +136,6 @@ public class CrawlingMarkupHandler extends AbstractSimpleMarkupHandler {
     */
     public void handleCloseElement(String elementName, int line, int col) {
         // TODO: Implement this.
-        System.out.println("End element:   " + elementName);
     }
 
     /**
@@ -97,32 +147,40 @@ public class CrawlingMarkupHandler extends AbstractSimpleMarkupHandler {
     * @param length  number of characters in ch
     */
     public void handleText(char ch[], int start, int length, int line, int col) {
-        // TODO: Implement this.
-        System.out.print("Characters:    \"");
-
+    		String words = "";
+    		
+    		
+    		// the style/script tags always have irrelevant text
+    		if (currentTag.equals("style") || currentTag.equals("script"))
+    			return;
+    		
         for(int i = start; i < start + length; i++) {
-            // Instead of printing raw whitespace, we're escaping it
-            switch(ch[i]) {
-                case '\\':
-                    System.out.print("\\\\");
-                    break;
-                case '"':
-                    System.out.print("\\\"");
-                    break;
-                case '\n':
-                    System.out.print("\\n");;
-                case '\r':
-                    System.out.print("\\r");
-                    break;
-                case '\t':
-                    System.out.print("\\t");
-                    break;
-                default:
-                    System.out.print(ch[i]);
-                    break;
-            }
+        		String letter = ch[i] +""; //convert to String
+        		// remove all punctuation from String
+        		if (letter.matches(onlyLetters))
+        			words += letter;
         }
 
-        System.out.print("\"\n");
+        // get rid of nbsp
+        words = words.replaceAll("nbsp", "");
+
+        // get rid of extra whitespace; lowercase string
+        words = words.replaceAll("\\s+", " ").trim().toLowerCase();
+        
+        String prev = "";
+        if (!words.isEmpty()) {
+        		for (String word : words.split(" ")) {
+        			/** 
+        			 * Left periods in because they are okay in the middle of Strings,
+        			 * as in URLs, now I can remove them from the end.
+        			 */
+        			word = word.replaceAll("[.]+$", "");
+        			
+        			// Add to index!!
+        			index.add(word, prev, currentPage);
+        			
+        			prev = word;
+        		}
+        }
     }
 }

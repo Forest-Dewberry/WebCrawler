@@ -5,6 +5,7 @@ import java.net.*;
 import java.util.*;
 
 import org.attoparser.simple.*;
+import org.attoparser.ParseException;
 import org.attoparser.config.ParseConfiguration;
 
 /**
@@ -34,6 +35,8 @@ public class WebCrawler {
                 System.err.printf("Error: URL '%s' was malformed and will be ignored!%n", url);
             }
         }
+        
+        HashSet<String> visited = new HashSet<String>();
 
         // Create a parser from the attoparser library, and our handler for markup.
         ISimpleMarkupParser parser = new SimpleMarkupParser(ParseConfiguration.htmlConfiguration());
@@ -42,13 +45,32 @@ public class WebCrawler {
         // Try to start crawling, adding new URLS as we see them.
         try {
             while (!remaining.isEmpty()) {
+            		URL current = remaining.poll();
+            		// make sure we haven't visited before
+            		if (visited.contains(current.getPath().toLowerCase()))
+            			continue;
+
+            		handler.updateCurrentURL(current);
+
                 // Parse the next URL's page
-                parser.parse(new InputStreamReader(remaining.poll().openStream()), handler);
+            		try {
+            			parser.parse(new InputStreamReader(current.openStream()), handler);
+            			visited.add(current.getPath().toLowerCase());
+            		} catch (FileNotFoundException e) {
+            			// don't want to add urls
+            			continue;
+            		} catch (ParseException e) {
+            			// thrown with images
+            			continue;
+            		} catch (UnknownServiceException e) {
+            			// .jpg
+            			continue;
+            		}
 
                 // Add any new URLs
-                remaining.addAll(handler.newURLs());
+            		remaining.addAll(handler.newURLs());
             }
-
+            System.out.println("FINISHED CRAWLING!");
             handler.getIndex().save("index.db");
         } catch (Exception e) {
             // Bad exception handling :(
@@ -56,5 +78,9 @@ public class WebCrawler {
             e.printStackTrace();
             System.exit(1);
         }
+        
+        System.out.println("Finished!");
+        for (String url : visited)
+        		System.out.println(url);
     }
 }
