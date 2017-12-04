@@ -6,6 +6,7 @@ import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.URL;
 
 import org.junit.BeforeClass;
@@ -13,6 +14,7 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.regex.*;
 import assignment.*;
@@ -121,16 +123,15 @@ public class MyTests {
 	public void explicitANDTest() {
 		String query = "hello goodbye";
 		String query2 = "hello goodbye hello";
-		String query3 = "( hello | ( goodbye | hello bye ) )";
+		String query3 = "( hello ( goodbye | hello bye ) )";
 		
-		String[] queryResults = queryTest.addExplicitAND(query.split(" "));
-		String[] query2Results = queryTest.addExplicitAND(query2.split(" "));
-		String[] query3Results = queryTest.addExplicitAND(query3.split(" "));
-		
-		assertTrue(queryResults[1].equals("&"));
-		assertTrue(query2Results[1].equals("&"));
-		assertTrue(query2Results[3].equals("&"));
-		assertTrue(query3Results[7].equals("&"));
+		String queryResults = "hello & goodbye";
+		String query2Results = "hello & goodbye & hello";
+		String query3Results = "( hello & ( goodbye | hello & bye ) )";
+
+		assertEquals(queryResults, String.join(" ", queryTest.addExplicitAND(query.split(" "))));
+		assertEquals(query2Results, String.join(" ", queryTest.addExplicitAND(query2.split(" "))));
+		assertEquals(query3Results, String.join(" ", queryTest.addExplicitAND(query3.split(" "))));
 	}
 	
 	/**
@@ -233,12 +234,38 @@ public class MyTests {
 	public void queryTest() {
 		String query1 = "(\"hello my name is\" & my | (!no & yes))";
 		String query2 = "(hello & (\"yes sir\") | !no)";
+		String query3 = "\"bob dylan\" ( big boy | toy ) & \"named troy\"";
+		String query4 = "test \"quan what does\"";
 		
 		String query1Result = "hello+my+name+is my & !no yes & |";
 		String query2Result = "hello yes+sir & !no |";
+		String query3Result = "bob+dylan big boy & toy | & named+troy &";
+		String query4Result = "test quan+what+does &";
 		
 		assertEquals(query1Result, String.join(" ", queryTest.getPostFix(query1)));
 		assertEquals(query2Result, String.join(" ", queryTest.getPostFix(query2)));
+		assertEquals(query3Result, String.join(" ", queryTest.getPostFix(query3)));
+		assertEquals(query4Result, String.join(" ", queryTest.getPostFix(query4)));
+	}
+	
+	/**
+	 * RHF -- Grep Automated Testing! 
+	 */
+	@Test
+	public void grepRHFTest1() throws Exception {
+		HashSet<String> output = new HashSet<String>();
+		// output of grep for term ' match '
+		BufferedReader grepOutput = new BufferedReader(new FileReader("RHF_match.txt"));
+		String line;
+		
+		while ((line = grepOutput.readLine()) != null) {
+			output.add(line);
+		}
+		WebCrawler.main(new String[] {"file:///Users/raghavan/Documents/314/proj7/WebCrawler/rhf/index.html"});
+		WebQueryEngine wqe = WebQueryEngine.fromIndex((WebIndex) Index.load("index.db"));
+		Collection<Page> urls = wqe.query("match");
+		
+		assertEquals(urls.size(), output.size());
 	}
 	 
 }

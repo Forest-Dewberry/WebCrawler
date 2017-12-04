@@ -15,8 +15,6 @@ import java.util.TreeSet;
 /**
  * A web-index which efficiently stores information about pages. Serialization is done automatically
  * via the superclass "Index" and Java's Serializable interface.
- *
- * TODO: Implement this!
  */
 public class WebIndex extends Index {
     /**

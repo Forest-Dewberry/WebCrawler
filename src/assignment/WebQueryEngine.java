@@ -183,10 +183,16 @@ public class WebQueryEngine {
     public String[] addExplicitAND(String[] query) {
     	ArrayList<String> tokens = new ArrayList<String>(Arrays.asList(query));
 		
+    		Set<String> operators = new HashSet<String>(Arrays.asList("&", "|"));
 		// add implicit AND's
 		for (int i = 0; i < tokens.size()-1; i++) {
-			if (tokens.get(i).matches("!?[A-Za-z-]+") && tokens.get(i+1).matches("!?[A-Za-z-]+")) {
-				tokens.add(i+1, "&");
+			// add &'s between two non-operators
+			if (!operators.contains(tokens.get(i)) && !operators.contains(tokens.get(i+1))) {
+				// filter out case ), ) and (, (
+				if (!tokens.get(i).equals(tokens.get(i+1)) &&
+						!tokens.get(i).equals("(") && !tokens.get(i+1).equals(")")) {
+					tokens.add(i+1, "&");
+				}
 			}
 		}
 		
@@ -202,7 +208,7 @@ public class WebQueryEngine {
     		for (String token : query.split(" ")) {
     			if (!token.matches("!?[A-Za-z-]+") && !token.equals("(") && !token.equals(")")
     					&& !token.equals("&") && !token.equals("|")
-    					&& !token.matches("((?:[A-Za-z-]+\\+)+\\[A-Za-z-]+)"))
+    					&& !token.matches("((?:[A-Za-z-]+\\+)+[A-Za-z-]+)"))
     				return false;
     		}
 
