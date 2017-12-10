@@ -26,8 +26,13 @@ public class MyTests {
 	 * for other testing purposes.
 	 * @return 
 	 */
-	WebQueryEngine queryTest = WebQueryEngine.fromIndex(new WebIndex());
+	static WebQueryEngine queryTest; 
 	
+	@BeforeClass
+	public static void loadWebIndex() throws Exception{
+		queryTest = WebQueryEngine.fromIndex((WebIndex) Index.load("index.db"));
+	}
+
 	@Test
 	public void getPageTest() {
 		String perfect = "https://www.google.com";
@@ -88,14 +93,14 @@ public class MyTests {
         String test7 = "hello; !hel(lo";
         String test8 = "hel\rlo\n\n";
         
-        assertEquals("hello.", removePunct(test1));
+        assertEquals("hello", removePunct(test1));
         assertEquals("hello", removePunct(test2));
         assertEquals("hello", removePunct(test3));
-        assertEquals("hello...", removePunct(test4));
+        assertEquals("hello", removePunct(test4));
         assertEquals("hello", removePunct(test5));
-        assertEquals("hel-lo", removePunct(test6));
+        assertEquals("hello", removePunct(test6));
         assertEquals("hello hello", removePunct(test7));
-        assertEquals("hello", removePunct(test8));
+        assertEquals("hel lo  ", removePunct(test8));
 
 	}
 	
@@ -111,6 +116,8 @@ public class MyTests {
 			String letter = c+"";
 			if (letter.matches(CrawlingMarkupHandler.onlyLetters))
 				result += letter;
+			else if (Character.isWhitespace(c))
+				result += " ";
 		}
 		return result;
 	}
@@ -249,23 +256,71 @@ public class MyTests {
 	}
 	
 	/**
-	 * RHF -- Grep Automated Testing! 
+	 * Verifies the results of a grep search match the results
+	 * given by the crawler for the word 'insane'.
 	 */
 	@Test
-	public void grepRHFTest1() throws Exception {
-		HashSet<String> output = new HashSet<String>();
-		// output of grep for term ' match '
-		BufferedReader grepOutput = new BufferedReader(new FileReader("RHF_match.txt"));
-		String line;
+	public void singleWordGrepTest1() throws Exception {
+		// word is 'insane'
+		HashSet<String> grepFound = loadGrepTest("insane");
+		Collection<Page> index = queryTest.query("insane");
+		HashSet<String> indexFound = new HashSet<String>();
+
+		for (Page p : index)
+			indexFound.add(p.getURL().getPath().toLowerCase());
 		
-		while ((line = grepOutput.readLine()) != null) {
-			output.add(line);
-		}
-		WebCrawler.main(new String[] {"file:///Users/raghavan/Documents/314/proj7/WebCrawler/rhf/index.html"});
-		WebQueryEngine wqe = WebQueryEngine.fromIndex((WebIndex) Index.load("index.db"));
-		Collection<Page> urls = wqe.query("match");
+		// tests set equality with cardinality and one subset
+		assertEquals(indexFound.size(), grepFound.size());
 		
-		assertEquals(urls.size(), output.size());
+		HashSet<String> difference = new HashSet<String>(grepFound);
+		difference.removeAll(indexFound);
+		assertEquals(0, difference.size());
 	}
-	 
+	
+	/**
+	 * Verifies the results of a grep search match the results
+	 * given by the crawler for the word 'crazy'.
+	 */
+	@Test
+	public void singleWordGrepTest2() throws Exception {
+		// word is 'crazy'
+		HashSet<String> grepFound = loadGrepTest("crazy");
+		Collection<Page> index = queryTest.query("crazy");
+		HashSet<String> indexFound = new HashSet<String>();
+
+		for (Page p : index)
+			indexFound.add(p.getURL().getPath().toLowerCase());
+		
+		// tests set equality with cardinality and one subset
+		//assertEquals(indexFound.size(), grepFound.size());
+		
+		HashSet<String> difference = new HashSet<String>(indexFound);
+		difference.removeAll(grepFound);
+		assertEquals(0, difference.size());
+	}
+	
+	/**
+	 * Loads a HashSet of Pages from Grep results stored in the
+	 * file grepTest.txt. The word indicates which files to load.
+	 */
+	public HashSet<String> loadGrepTest(String word) throws Exception {
+		BufferedReader br = new BufferedReader(new FileReader("grepTest.txt"));
+		String line;
+		boolean foundSection = false;
+		HashSet<String> found = new HashSet<String>();
+
+		while ((line = br.readLine()) != null) {
+			if (foundSection & line.contains("Word: "))
+				break;
+			if (line.equals("Word: " + word)) {
+				foundSection = true;
+				continue;
+			}
+			if (!foundSection)
+				continue;
+			found.add(line.toLowerCase());
+		}
+		return found;
+	}
+	
 }

@@ -70,7 +70,7 @@ public class WebCrawler {
                 // Add any new URLs
             		remaining.addAll(handler.newURLs());
             }
-            System.out.println("FINISHED CRAWLING!");
+            System.out.println("Finished crawling websites, saving index...");
             handler.getIndex().save("index.db");
         } catch (Exception e) {
             // Bad exception handling :(
@@ -78,9 +78,7 @@ public class WebCrawler {
             e.printStackTrace();
             System.exit(1);
         }
+        System.out.println("Saved!");
         
-        System.out.println("Finished!");
-        for (String url : visited)
-        		System.out.println(url);
     }
 }

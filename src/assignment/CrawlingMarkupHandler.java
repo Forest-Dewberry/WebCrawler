@@ -7,12 +7,10 @@ import org.attoparser.simple.*;
 /**
  * A markup handler which is called by the Attoparser markup parser as it parses the input;
  * responsible for building the actual web index.
- *
- * TODO: Implement this!
  */
 public class CrawlingMarkupHandler extends AbstractSimpleMarkupHandler {
 
-	public static final String onlyLetters = "[A-Za-z- .]*"; // Regex String used to find words
+	public static final String onlyLetters = "[A-Za-z]*"; // Regex String used to find words
 
 	WebIndex index;
 	Set<String> urls;
@@ -105,13 +103,13 @@ public class CrawlingMarkupHandler extends AbstractSimpleMarkupHandler {
     		assert currentURL != null : "Current URL must be set via updateCurrentURL!";
     		currentTag = elementName.toLowerCase();
 
-        // only use 'a' tagged hyperlinks, via Piazza @291
-        if (attributes == null || !elementName.equalsIgnoreCase("a"))
+        if (attributes == null)
         		return;
 
         // urls typically stored as attributes to key href
         for (String key : attributes.keySet()) {
-            String potentialURL = attributes.get(key);
+            String potentialURL = attributes.get(key).toLowerCase();
+
         		// only use urls ending in .html
             if (!potentialURL.endsWith("html"))
             		continue;
@@ -149,7 +147,6 @@ public class CrawlingMarkupHandler extends AbstractSimpleMarkupHandler {
     public void handleText(char ch[], int start, int length, int line, int col) {
     		String words = "";
     		
-    		
     		// the style/script tags always have irrelevant text
     		if (currentTag.equals("style") || currentTag.equals("script"))
     			return;
@@ -159,6 +156,8 @@ public class CrawlingMarkupHandler extends AbstractSimpleMarkupHandler {
         		// remove all punctuation from String
         		if (letter.matches(onlyLetters))
         			words += letter;
+        		else if (Character.isWhitespace(ch[i]))
+        			words += " ";
         }
 
         // get rid of nbsp
@@ -170,12 +169,6 @@ public class CrawlingMarkupHandler extends AbstractSimpleMarkupHandler {
         String prev = "";
         if (!words.isEmpty()) {
         		for (String word : words.split(" ")) {
-        			/** 
-        			 * Left periods in because they are okay in the middle of Strings,
-        			 * as in URLs, now I can remove them from the end.
-        			 */
-        			word = word.replaceAll("[.]+$", "");
-        			
         			// Add to index!!
         			index.add(word, prev, currentPage);
         			

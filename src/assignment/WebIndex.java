@@ -78,49 +78,94 @@ public class WebIndex extends Index {
     		keyword = keyword.toLowerCase();
 
     		if (keyword.contains("+")) {
-    			return getUrls(keyword.split("\\+"), pages);
+    			if (keyword.startsWith("!")) {
+    				keyword = keyword.substring(1);
+    				return getUrls(keyword.split("\\+"), pages, true);
+    			}
+    			return getUrls(keyword.split("\\+"), pages, false);
     		}
-    		if (wordsToPage.containsKey(keyword))
-    			return wordsToPage.get(keyword);
-    		else
+    		boolean not = keyword.startsWith("!");
+    		// remove the potential !
+    		if (not)
+    			keyword = keyword.substring(1);
+
+    		if (wordsToPage.containsKey(keyword)) {
+    			// if notted, return the set of all pages w/o term
+    			if (not) {
+    				Set<Page> allPages = new HashSet<Page>(pages);
+    				allPages.removeAll(wordsToPage.get(keyword));
+    				return allPages;
+    			} else {
+    				// otherwise just return the term
+    				return wordsToPage.get(keyword);
+    			}
+    		}
+    		else {
+    			// if notted, return all pages
+    			if (not) {
+    				return pages;
+    			}
     			return new HashSet<Page>();
+    		}
     }
     
     /**
      * Returns the set of URLS associated with a given keyword in 
      * the list of URLS given.
      */
-    public Set<Page> getUrls(String keyword, Collection<Page> urls) {
+    public Set<Page> getUrls(String keyword, Set<Page> urls) {
     		assert keyword != null && urls != null : "WebIndex: getUrls can't take null inputs!";
     		keyword = keyword.toLowerCase();
     		boolean not = false;
     		
     		if (keyword.contains("+")) {
-    			return getUrls(keyword.split("+"), urls);
+    			if (keyword.startsWith("!")) {
+    				keyword = keyword.substring(1);
+    				return getUrls(keyword.split("+"), urls, true);
+    			}
+    			return getUrls(keyword.split("+"), urls, false);
     		}
     		
     		if (keyword.startsWith("!")) {
     			not = true;
     			keyword = keyword.substring(1);
     			assert keyword.length() > 0 : "WebIndex: can't search for '!' term!";
-    			assert keyword.matches("\\w+") : "WebIndex: invalid word passed in!";
+
+    		}
+
+    		// if we don't have this word, then every page passes the requirement
+    		if (!wordsToPage.containsKey(keyword)) {
+    			return urls;
     		}
 
     		Set<Page> newUrls = new HashSet<Page>();
     		
-    		if (wordsToPage.containsKey(keyword)) {
-    			for (Page url : wordsToPage.get(keyword)) {
-    				if (urls.contains(url))
-    					newUrls.add(url);
+        /* if we're looking for pages WITH this word, then add
+    		   if we're looking for pages WITHOUT this word and this page doesn't
+    		   have it, then add */
+    		if (not) {
+    			// look through all pages without word
+    			HashSet<Page> pagesWithout = new HashSet<Page>(pages);
+    			pagesWithout.removeAll(wordsToPage.get(keyword));
+    			
+    			// set intersection of pages without and within the considered urls
+    			pagesWithout.retainAll(urls);
+    			return pagesWithout;
+    		} else {
+    			// if we're looking for pages with the word
+    			for (Page p : wordsToPage.get(keyword)) {
+    				if (urls.contains(p))
+    					newUrls.add(p);
     			}
     		}
+
     		return newUrls;
     }
     
     /**
      * Returns the set of Urls associated with a given phrase.
      */
-    public Set<Page> getUrls(String[] keyword, Collection<Page> urls) {
+    public Set<Page> getUrls(String[] keyword, Collection<Page> urls, boolean not) {
     		Set<Page> newUrls = null;
     		
     		// first find pages with all words in them
@@ -133,6 +178,8 @@ public class WebIndex extends Index {
     				}
     				// phrase doesn't exists if first word doesn't exist
     				else {
+    					if (not)
+    						return pages;
     					return new HashSet<Page>();
     				}
     			}
@@ -142,13 +189,15 @@ public class WebIndex extends Index {
             }
     			// phrase doesn't exists if word doesn't exist
     			else {
+    				if (not)
+    					return pages;
     				return new HashSet<Page>();
     			}
     		}
     		
     		// ensure every word is linked
     		if (newUrls.isEmpty()) {
-    			return newUrls;
+    			return pages;
     		} else {
     			HashSet<Page> finalUrls = new HashSet<Page>();
     			for (Page url : newUrls) {
@@ -164,6 +213,11 @@ public class WebIndex extends Index {
     						break;
     					}
     				}
+    			}
+    			if (not) {
+    				HashSet<Page> all = new HashSet<Page>(pages);
+    				all.removeAll(finalUrls);
+    				return all;
     			}
     			return finalUrls;
     		}

@@ -77,7 +77,7 @@ public class WebServer {
 
     // Probably add a disclaimer about file links
     Collection<Page> results = engine.query(params.get("query"));
-
+   
     // returns null if query is invalid
     if (results == null) {
     		content += "<p>Invalid query!<p>";

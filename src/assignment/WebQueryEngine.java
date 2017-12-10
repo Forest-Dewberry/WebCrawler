@@ -46,7 +46,7 @@ public class WebQueryEngine {
     		Queue<Object> terms = new LinkedList<Object>();
     		
     		for (String token : postfix) {
-    			if (token.matches("!?[A-Za-z-]+") || token.matches("((?:[A-Za-z-]+\\+)+[A-Za-z-]+)")) {
+    			if (token.matches("!?((?:[A-Za-z]+\\+)*[A-Za-z]+)")) {
     				terms.add(token);
     			}
     			else {
@@ -130,10 +130,14 @@ public class WebQueryEngine {
     		// change phrases from "hello my" to hello+my
     		query = fixPhrases(query);
     		
+    		// fix spacing on !, need to do after fixing phrases
+    		query = query.replaceAll("!\\s*", "!");
+
     		// validate given query
     		if (!isValidQuery(query)) {
     			return null;
     		}
+    		
 
     		// add explicit and, convert to postfix
     		return convertToPostfix(addExplicitAND(query.split(" ")));
@@ -181,8 +185,7 @@ public class WebQueryEngine {
      * Adds the explicit and between any two adjacent strings.
      */
     public String[] addExplicitAND(String[] query) {
-    	ArrayList<String> tokens = new ArrayList<String>(Arrays.asList(query));
-		
+    		ArrayList<String> tokens = new ArrayList<String>(Arrays.asList(query));
     		Set<String> operators = new HashSet<String>(Arrays.asList("&", "|"));
 		// add implicit AND's
 		for (int i = 0; i < tokens.size()-1; i++) {
@@ -195,7 +198,6 @@ public class WebQueryEngine {
 				}
 			}
 		}
-		
 		return tokens.toArray(new String[0]);
     }
     
@@ -206,9 +208,9 @@ public class WebQueryEngine {
     public boolean isValidQuery(String query) {
     		// make sure every token is either operator or word
     		for (String token : query.split(" ")) {
-    			if (!token.matches("!?[A-Za-z-]+") && !token.equals("(") && !token.equals(")")
+    			if (!token.equals("(") && !token.equals(")")
     					&& !token.equals("&") && !token.equals("|")
-    					&& !token.matches("((?:[A-Za-z-]+\\+)+[A-Za-z-]+)"))
+    					&& !token.matches("!?((?:[A-Za-z]+\\+)*[A-Za-z]+)"))
     				return false;
     		}
 
@@ -239,7 +241,7 @@ public class WebQueryEngine {
     		Stack<String> operators = new Stack<String>();
     		for (int i = 0; i < query.length; i++) {
     			// if word, move to output queue
-    			if (query[i].matches("!?[A-Za-z-]+") || query[i].matches("((?:[A-Za-z-]+\\+)+[A-Za-z-]+)")) {
+    			if (query[i].matches("!?((?:[A-Za-z]+\\+)*[A-Za-z]+)")) {
     				output.add(query[i]);
     			} else if (query[i].equals("(")) {
     				operators.push(query[i]);
@@ -251,7 +253,6 @@ public class WebQueryEngine {
     			} else {
     				// we have an operator
     				// peek at top of operator stack
-
     				while (!operators.isEmpty() && 
     						((query[i].equals("|")) || (query[i].equals("&") && operators.peek().equals("&"))) &&
     						!operators.peek().equals("(")) {
