@@ -76,13 +76,14 @@ public class WebServer {
       "<a href='/'>" + layoutLogo() + "</a>";
 
     // Probably add a disclaimer about file links
-    Collection<Page> results = engine.query(params.get("query"));
-   
-    // returns null if query is invalid
-    if (results == null) {
-    		content += "<p>Invalid query!<p>";
+    Collection<Page> results = null;
+    try {
+    		results = engine.query(params.get("query"));
+    } catch (IllegalArgumentException e) {
+    		content += "<p>Invalid query!<br>" + e.getMessage() + "</p>";
     }
-    else {
+   
+    if (results != null) {
     		if (results.size() > 0) {
     		  content += "<p>Here are the results of your query.<br> " +
     		    "Some browsers don't follow file:// links " +

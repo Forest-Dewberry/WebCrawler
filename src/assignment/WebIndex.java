@@ -27,6 +27,10 @@ public class WebIndex extends Index {
     public HashMap<String, Set<Page>> wordsToPage;
     public HashMap<Page, ArrayList<String>> links;
     
+    /**
+     * Initializes all three datatypes for linking
+     * word -> webpage.
+     */
     public WebIndex() {
     		pages = new HashSet<Page>();
     		wordsToPage = new HashMap<String, Set<Page>>();
@@ -35,7 +39,9 @@ public class WebIndex extends Index {
     
     /**
      * Adds an association between a String keyword and a URL to this
-     * WebIndex.
+     * WebIndex. The previous word is used to link the words together
+     * and identify phrases. If prev is the empty String, it is 
+     * assumed that this word is the beginning of a line.
      * 
      * @param keyword		the word to associate url with
      * @param prev			the word that came before it
@@ -46,16 +52,19 @@ public class WebIndex extends Index {
     		// ignore case
     		keyword = keyword.toLowerCase();
     		prev = prev.toLowerCase();
-
+    		
     		// check if page exists
     		if (pages.contains(url)) {
-    			// if no previous is specified, insert gibberish
+    			/* if no previous page is specified, insert gibberish to 
+    			 * separate this word from the last word on the previous block.
+    			 */
     			if (prev.equals(""))
     				links.get(url).add("*********");
     			else
     				assert links.get(url).get(links.get(url).size()-1).equals(prev) : "Indexing Error: Last saved word not equal to given!";
             links.get(url).add(keyword);
     		} else {
+    			// if it doesn't exist, initialize a new linked list
     			pages.add(url);
     			links.put(url, new ArrayList<String>(Arrays.asList(keyword)));
     		}
@@ -70,22 +79,29 @@ public class WebIndex extends Index {
     }
     
     /**
-     * Returns the set of URLS associated with a given keyword.
-     * Returns null if the keyword doesn't have any associated keywords.
+     * Returns the set of URLS associated with a given keyword. This method
+     * takes advantage of Hashing to return the URLS associated with a 
+     * single word in O(n) time.
      */
     public Set<Page> getUrls(String keyword) {
     		assert keyword != null : "WebIndex: getUrls can't take null input!";
+    		
+    		// ignore case
     		keyword = keyword.toLowerCase();
 
+    		// phrases are stored as lorem+ipsum, so redirect those to
+    		// another method
     		if (keyword.contains("+")) {
+    			// remove the not and pass it in as a boolean flag
     			if (keyword.startsWith("!")) {
     				keyword = keyword.substring(1);
     				return getUrls(keyword.split("\\+"), pages, true);
     			}
     			return getUrls(keyword.split("\\+"), pages, false);
     		}
+
     		boolean not = keyword.startsWith("!");
-    		// remove the potential !
+    		// remove the ! and set it as a flag 
     		if (not)
     			keyword = keyword.substring(1);
 
@@ -97,35 +113,39 @@ public class WebIndex extends Index {
     				return allPages;
     			} else {
     				// otherwise just return the term
-    				return wordsToPage.get(keyword);
+    				return new HashSet<Page>(wordsToPage.get(keyword));
     			}
     		}
     		else {
     			// if notted, return all pages
     			if (not) {
-    				return pages;
-    			}
+    				return new HashSet<Page>(pages);
+    			} // else just return an empty set
     			return new HashSet<Page>();
     		}
     }
     
     /**
      * Returns the set of URLS associated with a given keyword in 
-     * the list of URLS given.
+     * the list of URLS given. 
      */
     public Set<Page> getUrls(String keyword, Set<Page> urls) {
     		assert keyword != null && urls != null : "WebIndex: getUrls can't take null inputs!";
+    		// ignore case
     		keyword = keyword.toLowerCase();
     		boolean not = false;
     		
+    		// move phrases to another method
     		if (keyword.contains("+")) {
+    			// remove and pass the ! in as a flag
     			if (keyword.startsWith("!")) {
     				keyword = keyword.substring(1);
-    				return getUrls(keyword.split("+"), urls, true);
+    				return getUrls(keyword.split("\\+"), urls, true);
     			}
-    			return getUrls(keyword.split("+"), urls, false);
+    			return getUrls(keyword.split("\\+"), urls, false);
     		}
     		
+    		// remove and set the ! as a flag
     		if (keyword.startsWith("!")) {
     			not = true;
     			keyword = keyword.substring(1);
@@ -133,16 +153,18 @@ public class WebIndex extends Index {
 
     		}
 
-    		// if we don't have this word, then every page passes the requirement
     		if (!wordsToPage.containsKey(keyword)) {
-    			return urls;
+    			// if we're looking for pages without the word, and no page has
+    			// the word, then every page passes
+    			if (not) {
+    				return new HashSet<Page>(urls);
+    			} else {
+    				// no page passes
+    				return new HashSet<Page>();
+    			}
     		}
 
     		Set<Page> newUrls = new HashSet<Page>();
-    		
-        /* if we're looking for pages WITH this word, then add
-    		   if we're looking for pages WITHOUT this word and this page doesn't
-    		   have it, then add */
     		if (not) {
     			// look through all pages without word
     			HashSet<Page> pagesWithout = new HashSet<Page>(pages);
@@ -163,7 +185,12 @@ public class WebIndex extends Index {
     }
     
     /**
-     * Returns the set of Urls associated with a given phrase.
+     * Returns the set of Urls associated with a given phrase. This method
+     * first finds all the pages with every word in them, then searches those pages linearly
+     * to discover if the word exists.
+     * @param String[] keyword		an array of the words in the phrase
+     * @param urls					the domain of urls
+     * @param not					whether or not the phrase is notted
      */
     public Set<Page> getUrls(String[] keyword, Collection<Page> urls, boolean not) {
     		Set<Page> newUrls = null;
@@ -179,25 +206,28 @@ public class WebIndex extends Index {
     				// phrase doesn't exists if first word doesn't exist
     				else {
     					if (not)
-    						return pages;
+    						return new HashSet<Page>(urls);
     					return new HashSet<Page>();
     				}
     			}
     			// any other word
-            if (wordsToPage.containsKey(word)) {
+    			else if (wordsToPage.containsKey(word)) {
                 newUrls.retainAll(wordsToPage.get(word));
             }
     			// phrase doesn't exists if word doesn't exist
     			else {
     				if (not)
-    					return pages;
+    					return new HashSet<Page>(urls);
     				return new HashSet<Page>();
     			}
     		}
     		
-    		// ensure every word is linked
+    		// if there are no pages, with all the words, then return prematurely
     		if (newUrls.isEmpty()) {
-    			return pages;
+    			if (not)
+    				return new HashSet<Page>(urls);
+    			return new HashSet<Page>();
+    		// else, search linearly for the words
     		} else {
     			HashSet<Page> finalUrls = new HashSet<Page>();
     			for (Page url : newUrls) {
@@ -205,20 +235,25 @@ public class WebIndex extends Index {
     				ArrayList<String> words = links.get(url);
     				for (int i = 0; i < words.size(); i++) {
     					int cur = 0;
+    					// increment through the words starting at i, checking for the phrase
     					while (cur < keyword.length && words.get(i+cur).equals(keyword[cur])) {
     						cur++;
     					}
+    					// if we reached the end of the phrase, that means it exists
     					if (cur == keyword.length) {
     						finalUrls.add(url);
     						break;
     					}
     				}
     			}
+    			// if not, return all pages without
     			if (not) {
     				HashSet<Page> all = new HashSet<Page>(pages);
     				all.removeAll(finalUrls);
+    				all.retainAll(urls);
     				return all;
     			}
+    			finalUrls.retainAll(urls);
     			return finalUrls;
     		}
     }
@@ -228,7 +263,7 @@ public class WebIndex extends Index {
      * Returns a collection of all the pages in this index.
      */
     public Set<Page> allPages() {
-    		return pages;
+    		return new HashSet<Page>(pages);
     }
     
     /**
@@ -245,5 +280,28 @@ public class WebIndex extends Index {
     			return null;
     		}
     		return page;
+    }
+    
+    /**
+     * Determines whether a String is a word given. This method
+     * is used extensively in other classes to allow
+     * for Chinese characters ect.
+     */
+    public static boolean isWord(String word) {
+    		word = word.toLowerCase();
+    		// okay for word to begin with negation
+    		if (word.startsWith("!"))
+    			word = word.substring(1);
+    		for (String s : word.split("\\+")) {
+    			// means '+' occurs at beginning or end
+    			if (s.isEmpty())
+    				return false;
+    			for (Character c : s.toCharArray()) {
+    				// characters of all languages plus apostrophe are allowed
+    				if (!Character.isLetter(c) && c != '\'')
+    					return false;
+    			}
+    		}
+    		return true;
     }
 }

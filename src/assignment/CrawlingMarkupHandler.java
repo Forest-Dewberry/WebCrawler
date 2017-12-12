@@ -10,14 +10,15 @@ import org.attoparser.simple.*;
  */
 public class CrawlingMarkupHandler extends AbstractSimpleMarkupHandler {
 
-	public static final String onlyLetters = "[A-Za-z]*"; // Regex String used to find words
-
 	WebIndex index;
 	Set<String> urls;
 	URL currentURL;
 	Page currentPage;
 	String currentTag;
 
+	/**
+	 * Initializes the WebIndex and set of found URLs.
+	 */
     public CrawlingMarkupHandler() {
     		index = new WebIndex();
     		urls = new HashSet<String>();
@@ -51,11 +52,13 @@ public class CrawlingMarkupHandler extends AbstractSimpleMarkupHandler {
     				URL urlObject = new URL(currentURL, url);
     				newUrls.add(urlObject);
     			} catch (MalformedURLException e) {
-    				// this should never happen
+    				// Invalid URLs should have already been caught, so this should
+    				// never occudr
     				System.err.println("FATAL: invalid URL identified during crawl!");
     				System.exit(-1);
     			}
     		}
+    		// reset set of found URLs
     		urls = new HashSet<String>();
     		return newUrls;
     }
@@ -93,7 +96,8 @@ public class CrawlingMarkupHandler extends AbstractSimpleMarkupHandler {
     }
 
     /**
-    * Called at the start of any tag.
+    * Called at the start of any tag. This method is used primarily to
+    * identify and store and URLs stored in href tags.
     * @param elementName the element name (such as "div")
     * @param attributes  the element attributes map, or null if it has no attributes
     * @param line        the line in the document where this elements appears
@@ -106,12 +110,12 @@ public class CrawlingMarkupHandler extends AbstractSimpleMarkupHandler {
         if (attributes == null)
         		return;
 
-        // urls typically stored as attributes to key href
+        // urls stored as attributes to key href
         for (String key : attributes.keySet()) {
             String potentialURL = attributes.get(key).toLowerCase();
 
         		// only use urls ending in .html
-            if (!potentialURL.endsWith("html"))
+            if (!potentialURL.endsWith("html") && !potentialURL.endsWith("htm"))
             		continue;
 
             try {
@@ -133,13 +137,17 @@ public class CrawlingMarkupHandler extends AbstractSimpleMarkupHandler {
     * @param col         the column in the document where this element appears.
     */
     public void handleCloseElement(String elementName, int line, int col) {
-        // TODO: Implement this.
+    		// do nothing
     }
 
     /**
     * Called whenever characters are found inside a tag. Note that the parser is not
     * required to return all characters in the tag in a single chunk. Whitespace is
     * also returned as characters.
+    * 
+    * This method is used to identify words on the page and store them
+    * in this object's WebIndex.
+    * 
     * @param ch      buffer containint characters; do not modify this buffer
     * @param start   location of 1st character in ch
     * @param length  number of characters in ch
@@ -147,16 +155,17 @@ public class CrawlingMarkupHandler extends AbstractSimpleMarkupHandler {
     public void handleText(char ch[], int start, int length, int line, int col) {
     		String words = "";
     		
-    		// the style/script tags always have irrelevant text
+    		// the style/script tags always have irrelevant text, don't 
+    		// want to index it
     		if (currentTag.equals("style") || currentTag.equals("script"))
     			return;
     		
+    		
         for(int i = start; i < start + length; i++) {
-        		String letter = ch[i] +""; //convert to String
-        		// remove all punctuation from String
-        		if (letter.matches(onlyLetters))
-        			words += letter;
-        		else if (Character.isWhitespace(ch[i]))
+        		// only add letters and apostrophes to String, separate
+        		if (Character.isLetter(ch[i]) || ch[i] == '\'')
+        			words += ch[i];
+        		else
         			words += " ";
         }
 
@@ -165,13 +174,13 @@ public class CrawlingMarkupHandler extends AbstractSimpleMarkupHandler {
 
         // get rid of extra whitespace; lowercase string
         words = words.replaceAll("\\s+", " ").trim().toLowerCase();
-        
+
         String prev = "";
-        if (!words.isEmpty()) {
+        // sometimes empty string will end up as ' ', so ignore those strings as well
+        if (!words.isEmpty() && !words.equals(" ")) {
         		for (String word : words.split(" ")) {
         			// Add to index!!
         			index.add(word, prev, currentPage);
-        			
         			prev = word;
         		}
         }

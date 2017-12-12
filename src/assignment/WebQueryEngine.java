@@ -5,8 +5,6 @@ import java.util.*;
 /**
  * A query engine which holds an underlying web index and can answer textual queries with a
  * collection of relevant pages.
- *
- * TODO: Implement this!
  */
 public class WebQueryEngine {
 	
@@ -21,7 +19,7 @@ public class WebQueryEngine {
 	}
 
     /**
-     * Returns a WebQueryEngine that uses the given Index to constructe answers to queries.
+     * Returns a WebQueryEngine that uses the given Index to construct answers to queries.
      *
      * @param index The WebIndex this WebQueryEngine should use.
      * @return A WebQueryEngine ready to be queried.
@@ -32,45 +30,55 @@ public class WebQueryEngine {
 
     /**
      * Returns a Collection of URLs (as Strings) of web pages satisfying the query expression.
+     * This method throws an IllegalArgumentException if the query is invalid, though
+     * it is not declared for compatability with automated testing.
      *
      * @param query A query expression.
-     * @return A collection of web pages satisfying the query.
+     * @return A collection of web pages satisfying the query
      */
-    public Collection<Page> query(String query) {
+
+	public Collection<Page> query(String query) {
+		if (query == null)
+			throw new NullPointerException("query cannot take null input values!");
+
+		// first convert the query to postfix to parse
     		Queue<String> postfix = getPostFix(query);
 
-    		// return null if input query is invalid
-    		if (postfix == null)
-    			return null;
-
-    		Queue<Object> terms = new LinkedList<Object>();
+    		// parse query by adding terms to stack
+    		Stack<Object> terms = new Stack<Object>();
     		
     		for (String token : postfix) {
-    			if (token.matches("!?((?:[A-Za-z]+\\+)*[A-Za-z]+)")) {
-    				terms.add(token);
+    			if (WebIndex.isWord(token)) {
+    				terms.push(token);
     			}
     			else {
     				if (token.equals("&")) {
-    					assert terms.size() >= 2 : "WebQueryIndex : postfix notation broken!";
+    					// input was invalid if postfix failed to properly generate
+    					if (terms.size() < 2)
+    						throw new IllegalArgumentException("Operators must connect two distinct terms!");
     					
-    					Object arg1 = terms.poll();
-    					Object arg2 = terms.poll();
+    					// pop the first two objects off the stack and & them
+    					Object arg1 = terms.pop();
+    					Object arg2 = terms.pop();
     					
     					// four cases: Str-str, str-list, list-list, list-str
-    					// str/str
+    					// compute result, push back onto stack
     					if (arg1 instanceof String && arg2 instanceof String) {
     						Set<Page> result = new HashSet<Page>();
     						result = index.getUrls((String) arg1);
     						result = index.getUrls((String) arg2, result);
-    						terms.add(result);
+    						terms.push(result);
     					} else if (arg1 instanceof Set && arg2 instanceof String) {
     						arg1 = index.getUrls((String) arg2, (Set<Page>) arg1);
-    						terms.add(arg1);
+    						terms.push(arg1);
     					} else if (arg1 instanceof String && arg2 instanceof Set) {
     						arg2 = index.getUrls((String) arg1, (Set<Page>) arg2);
-    						terms.add(arg2);
+    						terms.push(arg2);
     					} else if (arg1 instanceof Set && arg2 instanceof Set) {
-    						terms.add(((Set<Page>) arg1).retainAll((Set<Page>) arg2));
+    						HashSet<Page> total = new HashSet<Page>();
+    						total.addAll((Set<Page>) arg1);
+    						total.retainAll((Set<Page>) arg2);
+    						terms.push(total);
     					} else {
     						// error
     						System.err.println("WebQueryIndex: Fatal error at &!");
@@ -78,28 +86,34 @@ public class WebQueryEngine {
     					}
     					
     				} else if (token.equals("|")) {
-    					assert terms.size() >= 2 : "WebQueryIndex : postfix notation broken!";
+    					// input was invalid if postfix failed to properly generate
+    					if (terms.size() < 2)
+    						throw new IllegalArgumentException("Operators must connect two distinct terms!");
 
-    					Object arg1 = terms.poll();
-    					Object arg2 = terms.poll();
+    					// pop the first two objects off the stack and & them
+    					Object arg1 = terms.pop();
+    					Object arg2 = terms.pop();
     					
     					// four cases: Str-str, str-list, list-list, list-str
-    					// str/str
+    					// compute result, push back onto stack
     					if (arg1 instanceof String && arg2 instanceof String) {
     						Set<Page> result = new HashSet<Page>();
     						result = index.getUrls((String) arg1);
     						result.addAll(index.getUrls((String) arg2));
-    						terms.add(result);
+    						terms.push(result);
     					} else if (arg1 instanceof Set && arg2 instanceof String) {
     						Set<Page> arg2Set = index.getUrls((String) arg2);
     						arg2Set.addAll((Set<Page>) arg1);
-    						terms.add(arg2Set);
+    						terms.push(arg2Set);
     					} else if (arg1 instanceof String && arg2 instanceof Set) {
     						Set<Page> arg1Set = index.getUrls((String) arg1);
     						arg1Set.addAll((Set<Page>) arg2);
-    						terms.add(arg1Set);
+    						terms.push(arg1Set);
     					} else if (arg1 instanceof Set && arg2 instanceof Set) {
-    						terms.add(((Set<Page>) arg1).addAll((Set<Page>) arg2));
+    						HashSet<Page> total = new HashSet<Page>();
+    						total.addAll((Set<Page>) arg1);
+    						total.addAll((Set<Page>) arg2);
+    						terms.push(total);
     					} else {
     						// error
     						System.err.println("WebQueryIndex: Fatal error at |!");
@@ -109,11 +123,14 @@ public class WebQueryEngine {
     			}
     		}
     		
-    		assert terms.size() == 1 : "WebQueryEngine : not all terms processed!";
+    		// if postfix failed to reduce to answer, input was invalid
+    		if (terms.size() != 1)
+    			throw new IllegalArgumentException("Operators must reduce terms to one term!");
+
     		if (terms.peek() instanceof String) {
-    			return index.getUrls((String) terms.poll());
+    			return index.getUrls((String) terms.pop());
     		}
-    		return (Set<Page>) terms.poll();
+    		return (Set<Page>) terms.pop();
     }
     
     /**
@@ -124,7 +141,13 @@ public class WebQueryEngine {
     public Queue<String> getPostFix(String query) {
     		query = query.toLowerCase();
     		
-    		// first fix spacing such that each token is 1-space separated
+    		// I use + marks to represent phrases, so some queries with + marks
+    		// might pass when they shouldn't, thus any query with a + is 
+    		// instantly failed
+    		if (query.contains("+"))
+    			throw new IllegalArgumentException("'+' character not allowed in query!");
+    		
+    		// fix spacing such that each token is 1-space separated
     		query = fixSpacing(query);
     		
     		// change phrases from "hello my" to hello+my
@@ -133,11 +156,9 @@ public class WebQueryEngine {
     		// fix spacing on !, need to do after fixing phrases
     		query = query.replaceAll("!\\s*", "!");
 
-    		// validate given query
-    		if (!isValidQuery(query)) {
-    			return null;
-    		}
-    		
+    		// validate given query, throws appropriate exception
+    		// if not valid
+    		isValidQuery(query);
 
     		// add explicit and, convert to postfix
     		return convertToPostfix(addExplicitAND(query.split(" ")));
@@ -164,6 +185,15 @@ public class WebQueryEngine {
      * Converts all phrases to concatenations with the + character.
      */
     public String fixPhrases(String input) {
+    		// first check for balanced number of quotes
+    		int quotes = 0;
+    		for (int i = 0; i < input.length(); i++) {
+    			if (input.charAt(i) == '"')
+    				quotes++;
+    		}
+    		if (quotes % 2 != 0)
+    			throw new IllegalArgumentException("Number of quotes must be balanced!");
+
     		ArrayList<String> tokens = new ArrayList<String>(Arrays.asList(input.split(" ")));
     		for (int i = 0; i < tokens.size()-1; i++) {
     			// check if there is open bracket
@@ -175,6 +205,9 @@ public class WebQueryEngine {
     					tokens.remove(i);
     				}
     				tokens.remove(i);
+    				// if empty phrase, query is invalid
+    				if (concat.isEmpty())
+    					throw new IllegalArgumentException("Cannot parse a null phrase!");
     				tokens.add(i, concat.substring(0, concat.length()-1));
     			}
     		}
@@ -182,7 +215,7 @@ public class WebQueryEngine {
     }
 
     /**
-     * Adds the explicit and between any two adjacent strings.
+     * Adds the explicit and between any two adjacent non-operators.
      */
     public String[] addExplicitAND(String[] query) {
     		ArrayList<String> tokens = new ArrayList<String>(Arrays.asList(query));
@@ -192,26 +225,26 @@ public class WebQueryEngine {
 			// add &'s between two non-operators
 			if (!operators.contains(tokens.get(i)) && !operators.contains(tokens.get(i+1))) {
 				// filter out case ), ) and (, (
-				if (!tokens.get(i).equals(tokens.get(i+1)) &&
-						!tokens.get(i).equals("(") && !tokens.get(i+1).equals(")")) {
-					tokens.add(i+1, "&");
-				}
+				if (tokens.get(i).equals("(") || tokens.get(i+1).equals(")")) {
+					// do nothing
+				} else
+                    tokens.add(i+1, "&");
 			}
 		}
 		return tokens.toArray(new String[0]);
     }
     
     /**
-     * Given a query of 1-space separated tokens
-     * returns whether or not it is a valid query.
+     * Given a query of 1-space separated tokens throws an 
+     * Exception if the query is invalid.
      */
-    public boolean isValidQuery(String query) {
+    public void isValidQuery(String query) {
     		// make sure every token is either operator or word
     		for (String token : query.split(" ")) {
     			if (!token.equals("(") && !token.equals(")")
     					&& !token.equals("&") && !token.equals("|")
-    					&& !token.matches("!?((?:[A-Za-z]+\\+)*[A-Za-z]+)"))
-    				return false;
+    					&& !WebIndex.isWord(token))
+    				throw new IllegalArgumentException("'" + token + "' token not allowed in query!");
     		}
 
     		// check for equal amount of open and close brackets
@@ -221,13 +254,33 @@ public class WebQueryEngine {
     				brackets++;
     			else if (query.charAt(i) == ')')
     				brackets--;
+    			if (brackets < 0)
+    				throw new IllegalArgumentException("Mismatched parenthesis in query!");
     		}
     		
     		// if brackets is not zero, num of brackets is unbalanced
     		if (brackets != 0)
-    			return false;
+    			throw new IllegalArgumentException("Number of brackets must be balanced!");
     		
-    		return true;
+    		// maps what characters cannot follow each other 
+    		// regex are (, ), &, |, word
+    		HashMap<String, List<String>> cantFollow = new HashMap<String, List<String>>();
+    		cantFollow.put("\\(", Arrays.asList("&", "|"));
+    		cantFollow.put("\\)", Arrays.asList());
+    		cantFollow.put("&", Arrays.asList(")", "&", "|"));
+    		cantFollow.put("\\|", Arrays.asList(")", "&", "|"));
+    		
+    		String[] tokens = query.split(" ");
+    		for (int i = 0; i < tokens.length-1; i++) {
+    			List<String> noFollow = new ArrayList<String>();
+    			for (String s : cantFollow.keySet()) {
+    				if (tokens[i].matches(s))
+    					noFollow = cantFollow.get(s);
+    			}
+    			
+    			if (noFollow.contains(tokens[i+1]))
+    				throw new IllegalArgumentException("'" + tokens[i+1] + "' cannot follow follow '" + tokens[i] +"' token!");
+    		}
     }
     
     
@@ -237,11 +290,13 @@ public class WebQueryEngine {
      * @return
      */
     public Queue<String> convertToPostfix(String[] query) {
+    		// intialize terms and operators queue/stack
     		Queue<String> output = new LinkedList<String>();
     		Stack<String> operators = new Stack<String>();
+
     		for (int i = 0; i < query.length; i++) {
     			// if word, move to output queue
-    			if (query[i].matches("!?((?:[A-Za-z]+\\+)*[A-Za-z]+)")) {
+    			if (WebIndex.isWord(query[i])) {
     				output.add(query[i]);
     			} else if (query[i].equals("(")) {
     				operators.push(query[i]);

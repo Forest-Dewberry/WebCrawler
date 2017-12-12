@@ -10,7 +10,9 @@ import java.io.InputStreamReader;
 import java.net.URL;
 
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -19,14 +21,22 @@ import java.util.HashSet;
 import java.util.regex.*;
 import assignment.*;
 
+/**
+ * All tests are made to run on with an index.db
+ * file of RHF. The file 'grepTest.txt' must be in 
+ * the path!
+ * @author Arvind Raghavan
+ */
 public class MyTests {
 	
 	/**
 	 * Tests the getPage helper method in WebIndex that is used
 	 * for other testing purposes.
-	 * @return 
 	 */
 	static WebQueryEngine queryTest; 
+	
+	@Rule
+	public ExpectedException exception = ExpectedException.none();
 	
 	@BeforeClass
 	public static void loadWebIndex() throws Exception{
@@ -46,6 +56,7 @@ public class MyTests {
 		assertNull(WebIndex.getPage(www));
 		assertNull(WebIndex.getPage(google));
 		assertNull(WebIndex.getPage(malformed));
+		
 	}
 	
 	/**
@@ -92,6 +103,7 @@ public class MyTests {
         String test6 = "hel-lo";
         String test7 = "hello; !hel(lo";
         String test8 = "hel\rlo\n\n";
+        String test9 = "(hello')";
         
         assertEquals("hello", removePunct(test1));
         assertEquals("hello", removePunct(test2));
@@ -101,6 +113,7 @@ public class MyTests {
         assertEquals("hello", removePunct(test6));
         assertEquals("hello hello", removePunct(test7));
         assertEquals("hel lo  ", removePunct(test8));
+        assertEquals("hello'", removePunct(test9));
 
 	}
 	
@@ -113,9 +126,8 @@ public class MyTests {
 		char[] inputs = input.toCharArray();
 		String result = "";
 		for (Character c : inputs) {
-			String letter = c+"";
-			if (letter.matches(CrawlingMarkupHandler.onlyLetters))
-				result += letter;
+			if (Character.isLetter(c) || c == '\'')
+				result += c;
 			else if (Character.isWhitespace(c))
 				result += " ";
 		}
@@ -173,27 +185,32 @@ public class MyTests {
 		String query2 = "( hello & !!cool )";
 		String query3 = "( hello | !cool )";
 		
-		assertFalse(queryTest.isValidQuery(query1));
-		assertFalse(queryTest.isValidQuery(query2));
-		assertTrue(queryTest.isValidQuery(query3));
+		exception.expect(IllegalArgumentException.class);
+		queryTest.isValidQuery(query1);
+		queryTest.isValidQuery(query2);
+
+		exception = ExpectedException.none();
+		queryTest.isValidQuery(query3);
 
 		// test num of brackets
 		query1 = "( nice & cool )";
 		query2 = "( ( nice & cool )";
 		query3 = "( hello & my | ( name | is ) | bar & ( hi )";
 		
-		assertTrue(queryTest.isValidQuery(query1));
-		assertFalse(queryTest.isValidQuery(query2));
-		assertFalse(queryTest.isValidQuery(query3));
+		queryTest.isValidQuery(query1);
+		exception.expect(IllegalArgumentException.class);
+		queryTest.isValidQuery(query2);
+		queryTest.isValidQuery(query3);
 		
 		// test phrases (+ used to indicate phrase)
 		query1 = "hello+hi+my";
 		query2 = "hello+contains+my";
 		query3 = "( my+name & hello | ( oh my ))";
 		
-		assertTrue(queryTest.isValidQuery(query1));
-		assertTrue(queryTest.isValidQuery(query2));
-		assertTrue(queryTest.isValidQuery(queryTest.fixSpacing(query3)));
+		exception = ExpectedException.none();
+		queryTest.isValidQuery(query1);
+		queryTest.isValidQuery(query2);
+		queryTest.isValidQuery(queryTest.fixSpacing(query3));
 	}
 	
 	/**
@@ -262,7 +279,7 @@ public class MyTests {
 	@Test
 	public void singleWordGrepTest1() throws Exception {
 		// word is 'insane'
-		HashSet<String> grepFound = loadGrepTest("insane");
+		HashSet<String> grepFound = loadGrepResults("insane");
 		Collection<Page> index = queryTest.query("insane");
 		HashSet<String> indexFound = new HashSet<String>();
 
@@ -284,26 +301,253 @@ public class MyTests {
 	@Test
 	public void singleWordGrepTest2() throws Exception {
 		// word is 'crazy'
-		HashSet<String> grepFound = loadGrepTest("crazy");
+		HashSet<String> grepFound = loadGrepResults("crazy");
 		Collection<Page> index = queryTest.query("crazy");
 		HashSet<String> indexFound = new HashSet<String>();
 
 		for (Page p : index)
 			indexFound.add(p.getURL().getPath().toLowerCase());
 		
-		// tests set equality with cardinality and one subset
-		//assertEquals(indexFound.size(), grepFound.size());
-		
-		HashSet<String> difference = new HashSet<String>(indexFound);
-		difference.removeAll(grepFound);
-		assertEquals(0, difference.size());
+		// tests set equality 
+		assertEquals(indexFound, grepFound);
 	}
 	
+	/**
+	 * Verifies the results of a grep search match the results
+	 * given by the crawler for the word 'mistress'.
+	 */
+	@Test
+	public void singleWordGrepTest3() throws Exception {
+		// word is 'mistress'
+		HashSet<String> grepFound = loadGrepResults("mistress");
+		Collection<Page> index = queryTest.query("mistress");
+		HashSet<String> indexFound = new HashSet<String>();
+
+		for (Page p : index)
+			indexFound.add(p.getURL().getPath().toLowerCase());
+		
+		// tests set equality 
+		assertEquals(indexFound, grepFound);
+	}
+	
+	/**
+	 * Verifies the results of a grep search match the results
+	 * given by the crawler for the word 'undocumented'.
+	 */
+	@Test
+	public void singleWordGrepTest4() throws Exception {
+		// word is 'undocumented'
+		HashSet<String> grepFound = loadGrepResults("undocumented");
+		Collection<Page> index = queryTest.query("undocumented");
+		HashSet<String> indexFound = new HashSet<String>();
+
+		for (Page p : index)
+			indexFound.add(p.getURL().getPath().toLowerCase());
+		
+		// tests set equality 
+		assertEquals(indexFound, grepFound);
+	}
+	
+	
+	/**
+	 * Verifies the results of a grep search match the results
+	 * given by the crawler for the query '!end'
+	 */
+	@Test
+	public void notWordGrepTest() throws Exception{
+		// word is 'unconstitutional'
+		HashSet<String> grepFound = loadGrepResults("unconstitutional");
+		Collection<Page> index = queryTest.query("!unconstitutional");
+		HashSet<String> indexFound = new HashSet<String>();
+
+		for (Page p : index)
+			indexFound.add(p.getURL().getPath().toLowerCase());
+		
+		// 9359 valid files in RHF
+		assertEquals(indexFound.size(), 9359 - grepFound.size());
+		
+		// check that the sets are disjoint
+		for (String s : indexFound)
+			assertFalse(grepFound.contains(s));
+		for (String s : grepFound)
+			assertFalse(indexFound.contains(s));
+	}
+	
+	/**
+	 * Verifies the results of a grep search for phrase queries.
+	 */
+	@Test
+	public void phraseGrepTest1() throws Exception {
+		// phrase is "I am forced"
+		HashSet<String> grepFound = loadGrepResults("i+am+forced");
+		Collection<Page> index = queryTest.query("\"I am Forced\"");
+		HashSet<String> indexFound = new HashSet<String>();
+
+		for (Page p : index)
+			indexFound.add(p.getURL().getPath().toLowerCase());
+		
+		// tests set equality 
+		assertEquals(indexFound, grepFound);
+	}
+
+	/**
+	 * Verifies the results of a grep search for not-phrase queries.
+	 */
+	@Test
+	public void notPhraseGrepTest() throws Exception {
+		// phrase is "I am forced"
+		HashSet<String> grepFound = loadGrepResults("!i+am+forced");
+		Collection<Page> index = queryTest.query("! \"I am Forced\"");
+		HashSet<String> indexFound = new HashSet<String>();
+
+		for (Page p : index)
+			indexFound.add(p.getURL().getPath().toLowerCase());
+		assertEquals(grepFound, indexFound);
+	}
+
+	/**
+	 * Verifies the results of an & query with grep.
+	 */
+	@Test
+	public void andGrepTest() throws Exception {
+		// & for 'undocumented' and 'mistress'
+		HashSet<String> grepFound = loadGrepResults("undocumented");
+		HashSet<String> grep1 = loadGrepResults("mistress");
+		grepFound.retainAll(grep1);
+		
+		Collection<Page> index = queryTest.query("mistress & undocumented");
+		HashSet<String> indexFound = new HashSet<String>();
+
+		for (Page p : index)
+			indexFound.add(p.getURL().getPath().toLowerCase());
+		
+		assertEquals(indexFound, grepFound);
+	}
+	
+	/**
+	 * Verifies the results of an | query with grep.
+	 */
+	@Test
+	public void orGrepTest() throws Exception {
+		// | for 'insane' and 'mistress'
+		HashSet<String> grep1 = loadGrepResults("mistress");
+		HashSet<String> grepFound = loadGrepResults("insane");
+		grepFound.addAll(grep1);
+
+		Collection<Page> index = queryTest.query("mistress | insane");
+		HashSet<String> indexFound = new HashSet<String>();
+
+		for (Page p : index)
+			indexFound.add(p.getURL().getPath().toLowerCase());
+
+		assertEquals(indexFound, grepFound);
+
+	}
+	
+	/**
+	 * Integration Test #1
+	 * Query: 'mistress & undocumented | (!\"I am forced"\")'
+	 */
+	@Test
+	public void integrationTest1() throws Exception {
+		HashSet<String> mistress = loadGrepResults("mistress");
+		HashSet<String> undocumented = loadGrepResults("undocumented");
+		HashSet<String> forced = loadGrepResults("!i+am+forced");
+		
+		HashSet<String> grepFound = new HashSet<String>(mistress);
+		grepFound.retainAll(undocumented);
+		grepFound.addAll(forced);
+		
+		Collection<Page> index = queryTest.query("mistress & undocumented | (!\"I am forced\")");
+		HashSet<String> indexFound = new HashSet<String>();
+
+		for (Page p : index)
+			indexFound.add(p.getURL().getPath().toLowerCase());
+		
+		assertEquals(indexFound, grepFound);
+	}
+	
+	/**
+	 * Integration Test #2
+	 * Query: 'insane | crazy & !\"I am forced\" | mistress & undocumented'
+	 */
+	@Test
+	public void integrationTest2() throws Exception {
+		HashSet<String> mistress = loadGrepResults("mistress");
+		HashSet<String> undocumented = loadGrepResults("undocumented");
+		HashSet<String> insane = loadGrepResults("insane");
+		HashSet<String> crazy = loadGrepResults("crazy");
+		HashSet<String> forced = loadGrepResults("!i+am+forced");
+		
+		HashSet<String> grepFound = new HashSet<String>(mistress);
+		grepFound.retainAll(undocumented);
+		HashSet<String> temp = new HashSet<String>(crazy);
+		temp.retainAll(forced);
+		grepFound.addAll(temp);
+		grepFound.addAll(insane);
+		
+		Collection<Page> index = queryTest.query("insane | crazy & !\"I am forced\" | mistress & undocumented");
+		HashSet<String> indexFound = new HashSet<String>();
+
+		for (Page p : index)
+			indexFound.add(p.getURL().getPath().toLowerCase());
+		
+		assertEquals(indexFound, grepFound);
+	}
+	
+	/**
+	 * Makes sure that all of these bad queries throw an illegalArgumentException
+	 * and not anything else.
+	 */
+	@Test
+	public void badQueryTest() {
+		exception.expect(IllegalArgumentException.class);
+		
+		// numbers not allowed
+		queryTest.query("lfhgkljaflkgjlkjlkj9f8difj3j98ouijsflkedfj90");
+		// unbalanced brackets
+		queryTest.query("( hello & goodbye | goodbye ( or hello )");
+		// & ) not legal
+		queryTest.query("A hello & goodbye | goodbye ( or hello &)");
+		// unbalanced quote
+		queryTest.query("kdf ksdfj (\") kjdf");
+		// empty quotes
+		queryTest.query("kdf ksdfj (\"\") kjdf");
+		// invalid text in quotes
+		queryTest.query("kdf ksdfj \"()\" kjdf");
+		// double negation invalid (decision)
+		queryTest.query("!!and");
+		
+		// gibberish
+		queryTest.query("kjlkfgj! ! ! !!! ! !");
+		queryTest.query("klkjgi & df & | herllo");
+		queryTest.query("kjdfkj &");
+		
+		// single negation
+		queryTest.query("( ! )");
+		queryTest.query("!");
+		
+		// quotes and parenthesis interspersed
+		queryTest.query("our lives | coulda ( \" been so ) \" but momma had to \" it all up wow\"");
+	}
+	
+	/**
+	 * Asserts different language queries are not invalid.
+	 */
+	@Test
+	public void languageTest() {
+		assertNotNull(queryTest.query("漢語"));
+		assertNotNull(queryTest.query("ンサートは"));
+		assertNotNull(queryTest.query("Ζ Θ Ι ΚΛ"));
+		assertNotNull(queryTest.query("Ζ Θ Ι ΚΛ"));
+		assertNotNull(queryTest.query("nalità umana ed al rafforzamento del rispetto dei diritti umani e delle libertà f"));
+	}
+
 	/**
 	 * Loads a HashSet of Pages from Grep results stored in the
 	 * file grepTest.txt. The word indicates which files to load.
 	 */
-	public HashSet<String> loadGrepTest(String word) throws Exception {
+	public HashSet<String> loadGrepResults(String word) throws Exception {
 		BufferedReader br = new BufferedReader(new FileReader("grepTest.txt"));
 		String line;
 		boolean foundSection = false;
@@ -312,7 +556,7 @@ public class MyTests {
 		while ((line = br.readLine()) != null) {
 			if (foundSection & line.contains("Word: "))
 				break;
-			if (line.equals("Word: " + word)) {
+			if (line.contains("Word:") && line.contains(word)) {
 				foundSection = true;
 				continue;
 			}
@@ -320,6 +564,8 @@ public class MyTests {
 				continue;
 			found.add(line.toLowerCase());
 		}
+		// fails if section wasn't found
+		assertTrue(foundSection);
 		return found;
 	}
 	

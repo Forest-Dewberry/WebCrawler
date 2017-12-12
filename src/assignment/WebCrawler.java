@@ -57,13 +57,13 @@ public class WebCrawler {
             			parser.parse(new InputStreamReader(current.openStream()), handler);
             			visited.add(current.getPath().toLowerCase());
             		} catch (FileNotFoundException e) {
-            			// don't want to add urls
+            			// don't want to add urls with missing files
             			continue;
             		} catch (ParseException e) {
-            			// thrown with images
+            			// thrown with images, don't want to add those
             			continue;
             		} catch (UnknownServiceException e) {
-            			// .jpg
+            			// occasionally thrown with .jpg files
             			continue;
             		}
 
@@ -72,11 +72,10 @@ public class WebCrawler {
             }
             System.out.println("Finished crawling websites, saving index...");
             handler.getIndex().save("index.db");
-        } catch (Exception e) {
-            // Bad exception handling :(
-            System.err.println("Error: Index generation failed!");
-            e.printStackTrace();
-            System.exit(1);
+        } catch (IOException e) {
+        		// we should never get here, all URL and parse exceptions should be caught
+        		System.err.println("Invalid input file!");
+        		System.exit(1);
         }
         System.out.println("Saved!");
         
