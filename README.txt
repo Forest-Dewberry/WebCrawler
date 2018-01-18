@@ -1,45 +1,12 @@
-We provide some skeleton code to get you started.  It is incomplete and not of the highest quality.
-Your assignment submission, naturally, will be complete and of the highest quality.
+# WebCrawler
+As a Turing Scholar, our final project in Data Structures was to create an HTML WebCrawler to index a portion of the web and then build a search engine to parse queries for text on the page and return relevant webpages. The queries supported the &, |, and ! operators as well as parenthesis.
 
-== INCLUDED FILES ==
+## Building the Index
+The crawler parsed the HTML using the [Attoparser](http://www.attoparser.org) library. Given a starting page, the crawler finds all the links on that page and adds them to a queue of links to index next. The parser takes every word on the page and hashes the current URL with that word, so the list of URLs associated with a given word can be retrieved in constant time. The index is then stored into the `index.db` file.
 
-README.txt                 This file
-WebCrawler.java            This is some sample code that crawls pages; run this to run the crawler
-CrawlingMarkupHandler.java Your Crawler code goes here
-Index.java                 A class with serialization code
-WebIndex.java              Your index goes here
-WebServer.java             Sample code for a simple server; run this to run the webserver
-WebQueryEngine.java        Your query engine goes here
-Page.java                  A wrapper class for page results
-tsoogle.png                Part of the web interface
-attoparser-*.jar           A library used for crawling
-superspoof.zip             A small website for you to test with
-rhf.zip                    A larger website to aid in testing
+## Search Engine
+The search engine loads the index and accepts word queries. The queries are then validated and converted to postfix using the [Shunting-Yard algorithim](https://en.wikipedia.org/wiki/Shunting-yard_algorithm). From there, the &, |, and ! operations are executed using set difference and interesection on the list of URLs returned by the index. Finally, the list of relevant pages is returned.
 
-== CRAWLER INSTRUCTIONS ==
-
-First, make sure you add the attoparser library to your classpath! Then, you can run the WebCrawler
-class, providing it ABSOLUTE URLS, on the two provided testing websites. Absolute URLS are prefixed
-by "file://", and look something like this:
-
-file://<absolute-path-to-file>
-
-For example, on the command line, using linux:
-
-java -cp attoparser-2.0.0.BETA2.jar:bin assignment.WebCrawler file:///<path-to-project>/superspoof/index.html
-
-This should run your crawler and save an index to "index.db"!
-
-== WEBSERVER INSTRUCTIONS ==
-
-To run the webserver, run the assignment.WebServer class; this will load your previously generated
-index.db file from your crawler, and then set up an HTTP webserver you can connect to in your
-browser:
-
-java -cp attoparser-2.0.0.BETA2.jar:bin assignment.WebServer
-
-The program will output "listening on port 1989"; to see the actual website, go to
-
-localhost:1989
-
-in your browser; the UI should show up promptly.
+## Some Images
+![example search query](images/img1.png)
+![example search results](images/img2.png)
