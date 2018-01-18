@@ -1,1 +1,8 @@
-/bin/
+bin/
+.DS_Store
+.classpath
+.project
+.rhf.zip
+.superspoof.zip
+report.pdf
+prog7.pdf

@@ -37,6 +37,7 @@ public class WebQueryEngine {
      * @return A collection of web pages satisfying the query
      */
 
+	@SuppressWarnings("unchecked")
 	public Collection<Page> query(String query) {
 		if (query == null)
 			throw new NullPointerException("query cannot take null input values!");

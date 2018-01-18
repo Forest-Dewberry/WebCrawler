@@ -29,7 +29,7 @@ public class WebCrawler {
         Queue<URL> remaining = new LinkedList<>();
         for (String url : args) {
             try {
-                remaining.add(new URL(url));
+                remaining.add(new URL(new URL("file:"),url));
             } catch (MalformedURLException e) {
                 // Throw this one out!
                 System.err.printf("Error: URL '%s' was malformed and will be ignored!%n", url);
